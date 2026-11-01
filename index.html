@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sim Beacon — Simulator GPS for your EFB</title>
+<meta name="description" content="Sim Beacon sends your flight simulator's position to ForeFlight, FliteDeck Pro and other EFB apps over Wi-Fi — no cables, no data port, no simulator changes.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  /* Layout: single-column flow; a dark "instrument" hero band, themed body sections below. */
+  :root{
+    --bg:#f5f8fb; --panel:#ffffff; --panel-2:#eef3f8;
+    --ink:#0e1c2b; --muted:#54667c; --line:#e2e8f0;
+    --accent:#0a7399; --accent-ink:#ffffff; --signal:#0f93bd;
+    --hero-1:#0a2440; --hero-2:#0a5f78; --hero-ink:#eaf6fb; --hero-muted:#9cc3d4;
+    --hero-line:rgba(255,255,255,.14); --hero-signal:#45d4ef;
+    --maxw:1060px;
+    --font-display:"Archivo","Arial Narrow",system-ui,sans-serif;
+    --font-body:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+    color-scheme:light;
+  }
+  @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+    --bg:#081321; --panel:#0f2032; --panel-2:#0c1a29;
+    --ink:#e9f1f8; --muted:#9bafc4; --line:#1c3145;
+    --accent:#2fb4d8; --accent-ink:#05222d; --signal:#3fc9ee;
+    color-scheme:dark;
+  }}
+  :root[data-theme="dark"]{
+    --bg:#081321; --panel:#0f2032; --panel-2:#0c1a29;
+    --ink:#e9f1f8; --muted:#9bafc4; --line:#1c3145;
+    --accent:#2fb4d8; --accent-ink:#05222d; --signal:#3fc9ee;
+    color-scheme:dark;
+  }
+
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);line-height:1.62;-webkit-font-smoothing:antialiased}
+  img{max-width:100%}
+  .wrap{max-width:var(--maxw);margin-inline:auto;padding-left:max(20px,env(safe-area-inset-left,0px));padding-right:max(20px,env(safe-area-inset-right,0px))}
+  section{padding-block:clamp(52px,8vw,92px)}
+  h1,h2,h3{font-family:var(--font-display);font-weight:800;text-wrap:balance;line-height:1.04;letter-spacing:-.015em;margin:0}
+  p{margin:0}
+  a{color:inherit}
+  .eyebrow{font-family:var(--font-mono);font-size:.74rem;font-weight:500;letter-spacing:.18em;text-transform:uppercase}
+
+  .hero{background:linear-gradient(155deg,var(--hero-1),var(--hero-2));color:var(--hero-ink);position:relative;overflow:hidden}
+  .hero::after{content:"";position:absolute;inset:0;background:
+    radial-gradient(60% 50% at 82% 8%,rgba(69,212,239,.20),transparent 60%),
+    radial-gradient(50% 40% at 0% 100%,rgba(69,212,239,.10),transparent 60%);pointer-events:none}
+  .hero .wrap{position:relative;z-index:1;padding-block:clamp(40px,6vw,64px) clamp(56px,8vw,96px)}
+  .brandbar{display:flex;align-items:center;gap:11px;padding-block:6px 0}
+  .brandbar b{font-family:var(--font-display);font-weight:700;font-size:1.18rem;letter-spacing:-.01em}
+  .hero .eyebrow{color:var(--hero-signal);margin-top:clamp(34px,6vw,58px)}
+  .hero h1{font-size:clamp(2.35rem,6.4vw,4.1rem);margin-top:16px;max-width:15ch}
+  .lede{color:var(--hero-muted);font-size:clamp(1.05rem,2.3vw,1.3rem);line-height:1.5;max-width:40ch;margin-top:18px}
+  .cta-row{display:flex;flex-wrap:wrap;gap:12px;margin-top:30px}
+  .btn{display:inline-flex;align-items:center;gap:9px;font-family:var(--font-body);font-weight:600;font-size:1rem;
+    padding:.78em 1.25em;border-radius:11px;border:1px solid transparent;text-decoration:none;cursor:pointer;transition:transform .12s ease,background .15s ease}
+  .btn:active{transform:translateY(1px)}
+  .btn-primary{background:var(--hero-signal);color:#042430}
+  .btn-primary:hover{background:#63ddf2}
+  .btn-ghost{background:transparent;border-color:var(--hero-line);color:var(--hero-ink)}
+  .btn-ghost:hover{background:rgba(255,255,255,.07)}
+
+  .readout{margin-top:34px;max-width:430px;border:1px solid var(--hero-line);border-radius:14px;
+    background:rgba(4,22,34,.42);backdrop-filter:blur(2px);padding:14px 16px;font-family:var(--font-mono)}
+  .readout .r-top{display:flex;align-items:center;gap:9px;font-size:.72rem;letter-spacing:.14em;color:var(--hero-muted);text-transform:uppercase}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--hero-signal);box-shadow:0 0 0 0 rgba(69,212,239,.6);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(69,212,239,.55)}70%{box-shadow:0 0 0 9px rgba(69,212,239,0)}100%{box-shadow:0 0 0 0 rgba(69,212,239,0)}}
+  @media (prefers-reduced-motion:reduce){.dot{animation:none}}
+  .readout .coord{font-size:clamp(1.02rem,3vw,1.32rem);color:var(--hero-signal);margin-top:9px;font-weight:500;letter-spacing:.01em;white-space:nowrap;overflow-x:auto}
+  .readout .r-bot{font-size:.76rem;color:var(--hero-muted);margin-top:8px;letter-spacing:.04em}
+
+  .lead{font-size:clamp(1.3rem,3vw,1.9rem);font-family:var(--font-display);font-weight:700;letter-spacing:-.01em;max-width:20ch;line-height:1.12}
+  .section-intro{color:var(--muted);font-size:1.08rem;max-width:62ch;margin-top:18px}
+  .seceyebrow{color:var(--accent);margin-bottom:14px}
+
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
+  .step{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:22px 20px 24px}
+  .step .n{font-family:var(--font-mono);font-size:.8rem;color:var(--accent);letter-spacing:.1em}
+  .step h3{font-size:1.24rem;margin-top:12px;margin-bottom:8px;letter-spacing:-.01em}
+  .step p{color:var(--muted);font-size:.98rem}
+
+  .compat{background:var(--panel-2)}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:36px}
+  .card{border:1px solid var(--line);border-radius:14px;background:var(--panel);padding:22px 20px;min-width:0}
+  .card h3{font-size:1.1rem;letter-spacing:-.005em}
+  .card p{color:var(--muted);font-size:.95rem;margin-top:7px}
+  .card .proto{font-family:var(--font-mono);font-size:.78rem;color:var(--accent);margin-top:12px;letter-spacing:.03em}
+  .noninvasive{margin-top:30px;display:flex;flex-wrap:wrap;gap:10px 26px;align-items:baseline}
+  .noninvasive b{font-family:var(--font-display);font-weight:700;font-size:1.05rem}
+  .noninvasive span{color:var(--muted);font-family:var(--font-mono);font-size:.82rem;letter-spacing:.03em}
+
+  .plans{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-top:36px;max-width:720px}
+  .plan{border:1px solid var(--line);border-radius:16px;background:var(--panel);padding:26px 24px;display:flex;flex-direction:column;gap:6px}
+  .plan.feature{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+  .plan .pname{font-family:var(--font-display);font-weight:700;font-size:1.3rem}
+  .plan .price{font-family:var(--font-display);font-weight:800;font-size:2.2rem;letter-spacing:-.02em}
+  .plan .price small{font-family:var(--font-body);font-weight:500;font-size:.95rem;color:var(--muted)}
+  .plan .pdesc{color:var(--muted);font-size:.98rem;margin-top:4px}
+  .freemonth{margin-top:22px;font-family:var(--font-mono);font-size:.86rem;color:var(--accent);letter-spacing:.03em}
+
+  .enterprise{background:linear-gradient(155deg,var(--hero-1),var(--hero-2));color:var(--hero-ink)}
+  .enterprise .seceyebrow{color:var(--hero-signal)}
+  .enterprise h2{font-size:clamp(1.9rem,4.5vw,2.7rem)}
+  .enterprise .section-intro{color:var(--hero-muted);max-width:60ch}
+  .eplist{display:grid;grid-template-columns:repeat(2,1fr);gap:14px 28px;margin-top:30px;max-width:760px;padding:0}
+  .eplist li{list-style:none;padding-left:22px;position:relative;color:var(--hero-ink);font-size:1rem}
+  .eplist li::before{content:"";position:absolute;left:0;top:.62em;width:9px;height:9px;border-radius:50%;background:var(--hero-signal)}
+  .eplist li span{color:var(--hero-muted)}
+  .einfo{margin-top:30px;color:var(--hero-muted);font-size:.98rem}
+  .emailbox{margin-top:16px;display:inline-flex;flex-wrap:wrap;align-items:center;gap:10px;border:1px solid var(--hero-line);border-radius:11px;padding:10px 12px;background:rgba(4,22,34,.35)}
+  .emailbox code{font-family:var(--font-mono);font-size:.95rem;color:var(--hero-ink);user-select:all}
+  .copybtn{font-family:var(--font-body);font-weight:600;font-size:.82rem;padding:.4em .8em;border-radius:8px;border:1px solid var(--hero-line);background:transparent;color:var(--hero-ink);cursor:pointer}
+  .copybtn:hover{background:rgba(255,255,255,.08)}
+
+  .cred p{font-size:clamp(1.15rem,2.6vw,1.5rem);font-family:var(--font-display);font-weight:600;line-height:1.3;max-width:28ch;letter-spacing:-.01em}
+  .cred .sub{font-family:var(--font-body);font-weight:400;font-size:1.02rem;color:var(--muted);max-width:60ch;margin-top:16px;letter-spacing:0}
+
+  footer{border-top:1px solid var(--line);padding-block:38px}
+  .foot{display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between}
+  .foot .fb{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:700}
+  .foot nav{display:flex;flex-wrap:wrap;gap:18px;font-size:.92rem}
+  .foot nav a{color:var(--muted);text-decoration:none}
+  .foot nav a:hover{color:var(--ink)}
+  .foot .copy{color:var(--muted);font-size:.84rem;font-family:var(--font-mono);letter-spacing:.03em;width:100%}
+
+  a:focus-visible,button:focus-visible{outline:2px solid var(--signal);outline-offset:2px;border-radius:8px}
+
+  @media (max-width:760px){
+    .steps,.cards,.plans,.eplist{grid-template-columns:1fr}
+    .plans{max-width:460px}
+  }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="brandbar">
+      <svg viewBox="0 0 48 48" width="38" height="38" aria-hidden="true">
+        <defs><linearGradient id="lg" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#0a5f8f"/><stop offset="1" stop-color="#19c6d8"/></linearGradient></defs>
+        <rect x="1" y="1" width="46" height="46" rx="12" fill="url(#lg)"/>
+        <g fill="none" stroke="#fff" stroke-linecap="round" stroke-width="2.3">
+          <path d="M14 18 Q24 9 34 18" opacity=".45"/><path d="M18 20 Q24 14 30 20" opacity=".82"/>
+        </g>
+        <path transform="translate(12,19)" fill="#fff" d="M12 2c-.6 0-1 .9-1 2v6.2L3 15v2l8-2.5V21l-2 1.5V24l3-1 3 1v-1.5L13 21v-6.5l8 2.5v-2l-8-4.8V4c0-1.1-.4-2-1-2z"/>
+      </svg>
+      <b>Sim Beacon</b>
+    </div>
+
+    <p class="eyebrow">Simulator GPS &rarr; EFB</p>
+    <h1>Put your simulator on the moving map.</h1>
+    <p class="lede">Sim Beacon sends your flight simulator's position to ForeFlight, FliteDeck Pro and other EFB apps over Wi-Fi &mdash; with no cables, no data port, and no changes to the simulator.</p>
+
+    <div class="readout" aria-label="Example transmitted position">
+      <div class="r-top"><span class="dot"></span>Transmitting &middot; 2 Hz</div>
+      <div class="coord">N 51 56 42.67&nbsp;&nbsp;W 000 04 10.90</div>
+      <div class="r-bot">XGPS 49002 &middot; GDL 90 4000 &middot; ForeFlight &check;</div>
+    </div>
+
+    <div class="cta-row">
+      <!-- On release, swap this span for: <a class="btn btn-primary" href="LIVE_APP_STORE_URL" target="_blank" rel="noopener">Download on the App Store</a> -->
+      <span class="btn btn-primary" aria-disabled="true" style="cursor:default">Coming soon to the App Store</span>
+      <a class="btn btn-ghost" href="#enterprise">Enterprise enquiries</a>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <p class="lead">Your EFB needs a position. Most simulators won't give it one.</p>
+    <p class="section-intro">Full-flight and training simulators rarely expose their position in a form an iPad EFB can read, and wiring into one usually isn't an option. Sim Beacon reads the position straight off the operator's screen with your iPhone camera and streams it to the EFB &mdash; so it works even on closed simulators with no data output of their own.</p>
+  </div>
+</section>
+
+<section class="compat" id="how">
+  <div class="wrap">
+    <p class="eyebrow seceyebrow">How it works</p>
+    <p class="lead">Three steps, nothing wired in.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="n">01 &middot; Aim</div>
+        <h3>Point the camera</h3>
+        <p>Mount your iPhone so its camera sees the simulator's latitude/longitude readout. No screen to read? Use Map mode &mdash; trace a route and fly it.</p>
+      </div>
+      <div class="step">
+        <div class="n">02 &middot; Read</div>
+        <h3>Read the position</h3>
+        <p>Sim Beacon recognises the coordinates on screen in any common notation, and tracks them smoothly as the aircraft moves.</p>
+      </div>
+      <div class="step">
+        <div class="n">03 &middot; Transmit</div>
+        <h3>Send it to the EFB</h3>
+        <p>The position streams over Wi-Fi to the iPad, and own-ship moves on the chart in real time &mdash; with track and ground speed.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="compat">
+  <div class="wrap">
+    <p class="eyebrow seceyebrow">Works with</p>
+    <p class="lead">The EFBs you already fly with.</p>
+    <div class="cards">
+      <div class="card">
+        <h3>ForeFlight</h3>
+        <p>Appears under More &rarr; Devices; enable it and own-ship follows the simulated position.</p>
+        <div class="proto">X-Plane (XGPS) &middot; port 49002</div>
+      </div>
+      <div class="card">
+        <h3>FliteDeck Pro &amp; Garmin Pilot</h3>
+        <p>Receive the position as a portable GPS source, including on SIDs and STARs.</p>
+        <div class="proto">GDL 90 &middot; port 4000</div>
+      </div>
+      <div class="card">
+        <h3>One or several iPads</h3>
+        <p>Drive a single EFB, or transmit to a whole row of them at once for a crew.</p>
+        <div class="proto">Up to 3 devices &middot; Pro</div>
+      </div>
+    </div>
+    <div class="noninvasive">
+      <b>Completely non-invasive &mdash;</b>
+      <span>no cables &middot; no data-port wiring &middot; no simulator modification</span>
+    </div>
+  </div>
+</section>
+
+<section class="compat" id="pricing">
+  <div class="wrap">
+    <p class="eyebrow seceyebrow">Pricing</p>
+    <p class="lead">Start free for a month.</p>
+    <div class="plans">
+      <div class="plan">
+        <div class="pname">Standard</div>
+        <div class="price">&pound;4.99<small> /month</small></div>
+        <div class="pdesc">Transmit to 1 EFB device.</div>
+      </div>
+      <div class="plan feature">
+        <div class="pname">Pro</div>
+        <div class="price">&pound;9.99<small> /month</small></div>
+        <div class="pdesc">Transmit to up to 3 EFB devices at once.</div>
+      </div>
+    </div>
+    <p class="freemonth">First month free &middot; prices shown in GBP, charged in your local currency</p>
+    <div class="cta-row">
+      <span class="btn btn-primary" aria-disabled="true" style="background:var(--accent);color:var(--accent-ink);cursor:default">Coming soon to the App Store</span>
+    </div>
+  </div>
+</section>
+
+<section class="enterprise" id="enterprise">
+  <div class="wrap">
+    <p class="eyebrow seceyebrow">For simulator operators &amp; training providers</p>
+    <h2>Enterprise</h2>
+    <p class="section-intro">For organisations running simulators at scale &mdash; tuned for your specific devices, licensed for your fleet, and extensible into threat training.</p>
+    <ul class="eplist">
+      <li>Profiles tuned to <span>specific simulator operator screens, delivered securely</span></li>
+      <li>Custom app branding <span>per airframe or organisation</span></li>
+      <li>Fleet and seat-based <span>licensing with offline activation</span></li>
+      <li>GPS-degraded &amp; GPS-denied <span>training &mdash; offset, drift, jam and spoof the EFB position</span></li>
+    </ul>
+    <p class="einfo">Enterprise features are in active development. To arrange a demonstration or register your interest:</p>
+    <div class="emailbox">
+      <code id="email">SimBeaconSupport@gmail.com</code>
+      <button class="copybtn" id="copy" type="button">Copy</button>
+    </div>
+  </div>
+</section>
+
+<section class="cred">
+  <div class="wrap">
+    <p class="eyebrow seceyebrow">Why it exists</p>
+    <p>Built by a working pilot, for the simulator.</p>
+    <p class="sub">Sim Beacon was made by a multi-engine and test pilot and qualified flying instructor who operates simulators &mdash; to solve a problem met in the sim, where the aircraft was flying but nothing on the EFB knew where it was.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <div class="fb">
+      <svg viewBox="0 0 48 48" width="26" height="26" aria-hidden="true">
+        <rect x="1" y="1" width="46" height="46" rx="12" fill="url(#lg)"/>
+        <g fill="none" stroke="#fff" stroke-linecap="round" stroke-width="2.3"><path d="M14 18 Q24 9 34 18" opacity=".45"/><path d="M18 20 Q24 14 30 20" opacity=".82"/></g>
+        <path transform="translate(12,19)" fill="#fff" d="M12 2c-.6 0-1 .9-1 2v6.2L3 15v2l8-2.5V21l-2 1.5V24l3-1 3 1v-1.5L13 21v-6.5l8 2.5v-2l-8-4.8V4c0-1.1-.4-2-1-2z"/>
+      </svg>
+      Sim Beacon
+    </div>
+    <nav>
+      <a href="https://cjj23.github.io/sim-beacon-support/" target="_blank" rel="noopener">Support</a>
+      <a href="https://cjj23.github.io/sim-beacon-support/privacy.html" target="_blank" rel="noopener">Privacy</a>
+      <a href="#enterprise">Enterprise</a>
+    </nav>
+    <div class="copy">&copy; 2026 Sim Beacon &middot; Send a simulated position, never a real one.</div>
+  </div>
+</footer>
+
+<script>
+  (function(){
+    var btn=document.getElementById('copy');
+    if(!btn) return;
+    btn.addEventListener('click',function(){
+      var text="SimBeaconSupport@gmail.com";
+      function done(){var o=btn.textContent;btn.textContent="Copied";setTimeout(function(){btn.textContent=o;},1400);}
+      function select(){
+        try{
+          var r=document.createRange();r.selectNodeContents(document.getElementById('email'));
+          var s=window.getSelection();s.removeAllRanges();s.addRange(r);
+        }catch(_){}
+      }
+      try{ navigator.clipboard.writeText(text).then(done,select); }catch(e){ select(); }
+    });
+  })();
+</script>
+
+</body>
+</html>
